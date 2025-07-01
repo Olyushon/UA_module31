@@ -38,12 +38,17 @@ public class Bootstrap : MonoBehaviour
             levelConfig.EnemySpawnPeriod
             );
 
+        ConditionFactory conditionFactory = new ConditionFactory(
+            levelConfig, 
+            _enemiesListService);
+
         _gameplayCycle = new GameplayCycle(
             mainHeroFactory,
             heroConfig,
             levelConfig,
             enemiesSpawner,
-            _enemiesListService);
+            _enemiesListService,
+            conditionFactory);
 
         yield return _gameplayCycle.Prepare();
 

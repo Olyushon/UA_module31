@@ -14,6 +14,8 @@ public class GameplayCycle : IDisposable
     private EnemiesSpawner _enemiesSpawner;
     private EnemiesListService _enemiesListService;
 
+    private ConditionFactory _conditionFactory;
+
     private GameMode _gameMode;
 
     public GameplayCycle(
@@ -21,13 +23,15 @@ public class GameplayCycle : IDisposable
         MainHeroConfig mainHeroConfig, 
         LevelConfig levelConfig, 
         EnemiesSpawner enemiesSpawner, 
-        EnemiesListService enemiesListService)
+        EnemiesListService enemiesListService,
+        ConditionFactory conditionFactory)
     {
         _mainHeroFactory = mainHeroFactory;
         _mainHeroConfig = mainHeroConfig;
         _levelConfig = levelConfig;
         _enemiesSpawner = enemiesSpawner;
         _enemiesListService = enemiesListService;
+        _conditionFactory = conditionFactory;
     }
 
     public IEnumerator Prepare()
@@ -35,13 +39,16 @@ public class GameplayCycle : IDisposable
         yield return new WaitForSeconds(0.5f);
 
         _mainHero = _mainHeroFactory.Create(_mainHeroConfig, _levelConfig.MainHeroStartPosition);
+        _conditionFactory.SetMainCharacter(_mainHero);
     }
 
     public IEnumerator Launch()
     {
         yield return new WaitForSeconds(0.5f);
 
-        _gameMode = new GameMode(_levelConfig, _mainHero, _enemiesSpawner, _enemiesListService);
+        _gameMode = new GameMode(_enemiesSpawner, _enemiesListService);
+        _gameMode.SetWinCondition(_conditionFactory.CreateWinCondition());
+        _gameMode.SetDefeatCondition(_conditionFactory.CreateDefeatCondition());
 
         _gameMode.Win += OnGameModeWin;
         _gameMode.Defeat += OnGameModeDefeat;

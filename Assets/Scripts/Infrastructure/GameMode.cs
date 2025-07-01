@@ -9,83 +9,54 @@ public class GameMode
     public event Action Win;
     public event Action Defeat;
 
-    private Func<bool> WinConditionCompleted;
-    private Func<bool> DefeatConditionCompleted;
+    private IEndGameCondition _winCondition;
+    private IEndGameCondition _defeatCondition;
 
-    private Func<string> WinMessage;
-    private Func<string> DefeatMessage;
-
-    private LevelConfig _levelConfig;
-    private MainCharacter _mainCharacter;
     private EnemiesSpawner _enemiesSpawner;
     private EnemiesListService _enemiesListService;
-
-    private float _currentTime;
-    private float _timeToWin;
 
     private bool _isRunning;
 
     public GameMode(
-        LevelConfig levelConfig, 
-        MainCharacter mainCharacter, 
         EnemiesSpawner enemiesSpawner,
         EnemiesListService enemiesListService)
     {
-        _levelConfig = levelConfig;
-        _mainCharacter = mainCharacter;
         _enemiesSpawner = enemiesSpawner;
         _enemiesListService = enemiesListService;
     }
 
     public void Start()
     {
-        _currentTime = 0;
-        _timeToWin = _levelConfig.TimeToWin;
-
-        switch (_levelConfig.WinCondition)
-        {
-            case WinCondition.TimeLived:
-                WinConditionCompleted = TimeToWinConditionCompleted;
-                WinMessage = () => $"You win! Time: {_currentTime.ToString("F2")}";
-                break;
-            case WinCondition.EnemiesKilled:
-                WinConditionCompleted = KilledEnemiesToWinConditionCompleted;
-                WinMessage = () => $"You win! Killed enemies: {_enemiesListService.KilledCount}";
-                break;
-        }
-
-        switch (_levelConfig.DefeatCondition)
-        {
-            case DefeatCondition.Death:
-                DefeatConditionCompleted = MainCharacterIsDeadConditionCompleted;
-                DefeatMessage = () => $"You lose! Main character is dead";
-                break;
-            case DefeatCondition.EnemiesSpawned:
-                DefeatConditionCompleted = SpawnedEnemiesToDefeatConditionCompleted;
-                DefeatMessage = () => $"You lose! Spawned enemies: {_enemiesListService.Count}";
-                break;
-        }
-
         _isRunning = true;
+    }
+
+    public void SetWinCondition(IEndGameCondition winCondition)
+    {
+        _winCondition = winCondition;
+    }
+
+    public void SetDefeatCondition(IEndGameCondition defeatCondition)   
+    {
+        _defeatCondition = defeatCondition;
     }
 
     public void Update(float deltaTime)
     {
-
         if (_isRunning == false)
             return;
 
         ProcessEnemiesSpawn(deltaTime);
 
-        ProcessCountingTime(deltaTime);
+        _winCondition?.Process(deltaTime);
+        _defeatCondition?.Process(deltaTime);
 
-        if (WinConditionCompleted.Invoke())
+        if (_winCondition != null && _winCondition.IsCompleted())
         {
             ProcessWin();
             return;
         }
 
-        if (DefeatConditionCompleted.Invoke())
+        if (_defeatCondition != null && _defeatCondition.IsCompleted())
         {
             ProcessDefeat();
             return;
@@ -97,25 +68,15 @@ public class GameMode
         _enemiesSpawner.ProcessEnemiesSpawn(deltaTime);
     }
 
-    private void ProcessCountingTime(float deltaTime)
-    {
-        _currentTime += deltaTime;
-    }
-
     private void ProcessEndGame()
     {
         _isRunning = false;
     }
 
-    private void Clear()
-    {
-        // _enemiesListService.ClearAndDestroy();
-    }
-
     private void ProcessDefeat()
     {
         ProcessEndGame();
-        Debug.Log(DefeatMessage.Invoke());
+        Debug.Log(_defeatCondition.GetMessage());
         Clear();
         Defeat?.Invoke();
     }
@@ -123,15 +84,13 @@ public class GameMode
     private void ProcessWin()
     {
         ProcessEndGame();
-        Debug.Log(WinMessage.Invoke());
+        Debug.Log(_winCondition.GetMessage());
         Clear();
         Win?.Invoke();
     }
 
-    private bool TimeToWinConditionCompleted() => _currentTime >= _timeToWin;
-    private bool KilledEnemiesToWinConditionCompleted() => _enemiesListService.KilledCount >= _levelConfig.KilledEnemiesToWin;
-
-    private bool SpawnedEnemiesToDefeatConditionCompleted() => _enemiesListService.Count >= _levelConfig.SpawnedEnemiesToDefeat;
-    private bool MainCharacterIsDeadConditionCompleted() => _mainCharacter == null || _mainCharacter.IsDead;
-
+    private void Clear()
+    {
+        // _enemiesListService.ClearAndDestroy();
+    }
 }
